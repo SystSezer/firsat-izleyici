@@ -111,6 +111,23 @@ ILGILI = re.compile(
     r"\bcrm\b|\bopenai\b|\bgpt\b|\bllm\b|\bchatbots?\b|\bairtable\b|"
     r"\bsupabase\b|\bbots?\b|\bscript(ing|s)?\b", re.I)
 
+# BASKA BIRININ YIGINI. "Otomasyon" kelimesi bizim yaptigimiz sey demek degil.
+# Olculen hata: "SharePoint Powered Canvas App & Workflow" 99 puanla ikinci
+# siraya cikti — metninde workflow, integration, api geciyordu ve rakibi azdi.
+# Gercekte Microsoft Power Platform isi: Power Apps + Power Automate + SharePoint.
+# Bizim yigimizla hicbir ilgisi yok. Power Automate'in "workflow"u ile n8n'in
+# "workflow"u ayni kelime, farkli teknoloji.
+#
+# Bu ilanlar elenmez, ISARETLENIR: bir gun o tarafi ogrenmeye karar verirsek
+# listede dursun. Ama simdi teklif yazmak, sahip olmadigimiz uzmanligi iddia
+# etmek olur.
+BASKA_YIGIN = re.compile(
+    r"power ?apps|power ?automate|power ?platform|\bsharepoint\b|\bdataverse\b|"
+    r"\bsalesforce (flow|apex)\b|\bmulesoft\b|\bboomi\b|\bworkato\b|"
+    r"\boutsystems\b|\bmendix\b|\bappian\b|\bpega\b|\bservicenow\b|"
+    r"\bwordpress\b|\bwix\b|\bsquarespace\b|\bshopify (theme|liquid)\b|"
+    r"\bunity\b|\bunreal\b|\bandroid studio\b|\bswiftui\b|\bflutter\b", re.I)
+
 # Rakip sayisi: kazanma ihtimalinin en guclu tek gostergesi.
 # Freelancer'da n8n isine medyan 101 teklif geliyor; orada 1/101 olmak,
 # panoda 1/5 olmakla ayni sey degil.
@@ -142,7 +159,10 @@ def puanla(baslik: str, metin: str, rakip: int) -> tuple[int, list[str]]:
     m = (baslik + " " + metin).lower()
     if not ILGILI.search(m):
         return -999, ["ilgisiz: otomasyon/entegrasyon gecmiyor"]
+    yabanci = BASKA_YIGIN.search(m)
     puan, sebep = 0, []
+    if yabanci:
+        sebep.append(f"?? BASKA YIGIN: {yabanci.group(0)}")
 
     # GUCLU ve ORTA icin baglam sart; ZAYIF her yerde gecerli
     for grup, isaret, baglam_gerek in ((GUCLU, "!", True), (ORTA, "+", True),
@@ -157,6 +177,10 @@ def puanla(baslik: str, metin: str, rakip: int) -> tuple[int, list[str]]:
     rp, rs = rakip_puani(rakip)
     puan += rp
     sebep.append(rs)
+
+    if yabanci:
+        puan -= 45      # elemiyoruz, siranin sonuna atiyoruz
+        sebep.append("-45 baska yigin")
 
     b = BUTCE.findall(m)
     if b:

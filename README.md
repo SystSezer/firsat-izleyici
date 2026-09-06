@@ -150,3 +150,47 @@ schtasks /create /tn "FirsatIzleyici" /tr "py C:\...\firsat-izleyici\izle.py 30"
 - Freelancer'ın teklif sayısı anlık; ilan yeniyse düşük görünüp hızla artabilir.
 - n8n panosunda "rakip" = konudaki cevap sayısı. Bazı cevaplar soru olabilir.
 - İlanı yorumlamaz, sıraya koyar. **Karar insanda.**
+
+---
+
+## `posta.py` — cevap ve bounce izleyici
+
+Gmail zaten "yeni mail" bildirimi gönderiyor. Bu onu tekrarlamıyor, iki farklı
+şey yapıyor:
+
+| Sorun | Gmail çözüyor mu |
+|---|---|
+| Birisi cevap verdi | ✅ |
+| **4.780 okunmamışın içinde 14 hedefimizden biri mi** | ❌ |
+| **Mail geri döndü mü** | ❌ — sessizce olur |
+
+İkincisi asıl mesele. Zaten bir bounce yaşandı — `info@qgroup.nl`, 550 5.1.1 —
+ve ancak elle bakınca görüldü. **Bounce, hata veren değil sessizce olan
+arızadır**; bu reponun tamamıyla aynı konu.
+
+### Güvenlik
+
+- Kimlik bilgileri yalnızca ortam değişkeninden okunur. Koda yazılmaz, ekrana
+  basılmaz, log'a düşmez. IMAP giriş hatası bile ayrıntısız basılır çünkü hata
+  metni kimlik bilgisi içerebilir.
+- IMAP **salt-okunur** açılır (`readonly=True`) ve başlıklar `BODY.PEEK` ile
+  çekilir: hiçbir mail silinmez, taşınmaz, okundu işaretlenmez.
+- Yalnızca hedef listesindeki alan adlarından gelenler ve bounce bildirimleri
+  işlenir. Diğer maillerin içeriğine bakılmaz.
+
+### Gmail kurulumu
+
+İki adımlı doğrulama açık olmalı, sonra **uygulama şifresi** üretilir —
+hesap şifresi değil.
+
+```powershell
+setx POSTA_KULLANICI "sezerkiras28@gmail.com"
+setx POSTA_SIFRE     "<16 karakterlik uygulama sifresi>"
+```
+
+### Neden müşteriye satılmıyor
+
+Müşterinin posta kutusuna erişim tutmak, onun kimlik bilgilerini saklamak
+demek. Sıfır referanslı tek kişilik bir operasyon için bu ciddi bir sorumluluk
+ve KVKK/GDPR yükü. Önce kendimize kuruyoruz; çalıştığını gösterdikten sonra
+satmak konuşulur.
