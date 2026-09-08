@@ -38,6 +38,10 @@ from email.header import decode_header, make_header
 
 import httpx
 
+import ayar
+
+ayar.yukle()
+
 SUNUCU = os.environ.get("POSTA_SUNUCU", "imap.gmail.com")
 
 # Gonderdigimiz maillerin gittigi alan adlari. Bu listeden gelen her sey onemli.

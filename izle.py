@@ -29,6 +29,10 @@ from pathlib import Path
 
 import httpx
 
+import ayar
+
+ayar.yukle()
+
 UA = "FirsatIzleyici/1.0 (+iletisim: sezerkiras28@gmail.com)"
 DEPO = Path(__file__).with_name("gorulen.json")
 
@@ -86,6 +90,14 @@ ORTA = {                       # yapabiliriz, rekabet daha yuksek — baglam sar
 ZAYIF = {                      # baglam ARANMAZ: tuzak her yerde tuzaktir
     r"\bai agent\b|\bagentic\b": -5,
     r"build from scratch|from the ground up": -5,
+    # DIL SARTI. Olculen ornek: "N8N need help with this system" ilani 3 rakiple
+    # cazip gorunuyordu; metni "Ukrainian- or Russian-speaking n8n specialist"
+    # diyor. Bizim icin kesin engel, ama puanlayici gormuyordu. Ingilizce ve
+    # Turkce disindaki dil sarti pratikte ilani kapatir.
+    r"\b(russian|ukrainian|german|french|spanish|italian|dutch|polish|"
+    r"portuguese|arabic|hebrew|japanese|korean|mandarin|chinese)[- ]speaking\b|"
+    r"\bmust speak (russian|ukrainian|german|french|spanish|arabic)\b|"
+    r"\bnative (russian|ukrainian|german|french|spanish|arabic) speaker\b": -60,
     # DIKKAT: burada bir zamanlar "\bintern" yaziyordu ve "internal",
     # "international", "internet" kelimelerine takiliyordu. "Infra-only n8n
     # work — PAID trial" ilani bu yuzden -30 yedi. excel/excellent hatasinin
@@ -142,17 +154,43 @@ def rakip_puani(n: int) -> tuple[int, str]:
     return -70, f"-70 rakip:{n}"
 
 
-def gorulenler() -> set[str]:
+def _depo_oku() -> dict:
     if DEPO.exists():
         try:
-            return set(json.loads(DEPO.read_text(encoding="utf-8")))
+            d = json.loads(DEPO.read_text(encoding="utf-8"))
+            if isinstance(d, list):            # eski bicim: duz liste
+                return {"gorulen": d, "fl_son": 0}
+            return d
         except (ValueError, OSError):
-            return set()
-    return set()
+            pass
+    return {"gorulen": [], "fl_son": 0}
 
 
-def kaydet(s: set[str]) -> None:
-    DEPO.write_text(json.dumps(sorted(s)), encoding="utf-8")
+def gorulenler() -> set[str]:
+    return set(_depo_oku().get("gorulen", []))
+
+
+def kaydet(s: set[str], fl_son: float | None = None) -> None:
+    d = _depo_oku()
+    d["gorulen"] = sorted(s)
+    if fl_son is not None:
+        d["fl_son"] = fl_son
+    DEPO.write_text(json.dumps(d), encoding="utf-8")
+
+
+# 15 dakikada bir calismak n8n panosu icin sorun degil: tek bir JSON istegi.
+# Freelancer her kosuda DORT sorgu yapiyor; 15 dakikada bir demek gunde 384
+# istek demek. Acik bir API'ye karsi nazik degil ve gerek de yok — oradaki
+# ilanlar zaten medyan 101 teklif aliyor, on dakika erken gormek bir sey
+# degistirmiyor. Panoda ise 3-5 cevapli ilanlar var; orada dakikalar onemli.
+#
+# Cozum: takvim ne olursa olsun Freelancer en fazla 45 dakikada bir sorgulanir.
+# Boylece "her 15 dakikada bir calistir" demek guvenli hale geliyor.
+FL_ARALIK = 45 * 60
+
+
+def fl_zamani_mi() -> bool:
+    return (time.time() - float(_depo_oku().get("fl_son", 0))) >= FL_ARALIK
 
 
 def puanla(baslik: str, metin: str, rakip: int) -> tuple[int, list[str]]:
@@ -268,7 +306,12 @@ def main() -> None:
 
     with httpx.Client(headers={"User-Agent": UA}, timeout=45,
                       follow_redirects=True) as c:
-        ilanlar = n8n_ilanlar(c) + fl_ilanlar(c)
+        fl_calisti = fl_zamani_mi()
+        ilanlar = n8n_ilanlar(c)
+        if fl_calisti:
+            ilanlar += fl_ilanlar(c)
+        else:
+            print("  (freelancer atlandi — 45 dk dolmadi)")
         if not ilanlar:
             # Sessizce bos donmek en tehlikeli davranis: kullanici bunu
             # "yeni is yok" diye okur. Iki kaynak da bos donduyse sorun bizde.
@@ -300,7 +343,8 @@ def main() -> None:
             if telegram(mesaj):
                 gonderilen += 1
 
-    kaydet(gor | {i["id"] for i in ilanlar})
+    kaydet(gor | {i["id"] for i in ilanlar},
+           fl_son=time.time() if fl_calisti else None)
 
     if ilk_kosu:
         print(f"\nILK KOSU: {len(ilanlar)} ilan depoya yazildi, bildirim gonderilmedi.")

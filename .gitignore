@@ -1,3 +1,4 @@
+.env
 gorulen.json
 __pycache__/
 *.pyc
